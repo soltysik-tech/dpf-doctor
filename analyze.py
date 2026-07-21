@@ -6,6 +6,13 @@ from datetime import datetime
 
 from pids import NEEDLES, classify
 
+# analyze.py only tracks a subset of the shared registry.
+_ANALYZE_KEYS = frozenset({
+    "regen", "dpf_dp", "soot_trig", "avg_t_regen", "avg_d_regen",
+    "d_since_regen", "odo_total", "trip_dist", "speed", "rpm_k", "rpm",
+    "coolant_t", "oil_t", "oil_lvl", "nox_regen",
+})
+
 def parse_fname(p):
     m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$", p)
     if not m: return None
@@ -29,7 +36,7 @@ def scan_file(path):
             t = f(row[0]); pid = row[1].strip(); v = f(row[2])
             if t is None or v is None: continue
             k = classify(pid)
-            if k is None: continue
+            if k is None or k not in _ANALYZE_KEYS: continue
             series[k].append((t, v))
             if t_min is None or t < t_min: t_min = t
             if t_max is None or t > t_max: t_max = t
@@ -140,10 +147,10 @@ def main():
     seen = set()
     for s in out:
         for field in s:
-            for _, key in NEEDLES:
+            for key in _ANALYZE_KEYS:
                 if field == f"{key}_last":
                     seen.add(key)
-    all_keys = {k for _, k in NEEDLES}
+    all_keys = set(_ANALYZE_KEYS)
     missing = sorted(all_keys - seen)
     coverage = "found: " + (", ".join(sorted(seen)) or "(none)")
     if missing:
