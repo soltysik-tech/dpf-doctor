@@ -3,29 +3,7 @@
 import argparse, csv, glob, os, sys, json, bisect, re, time
 from collections import defaultdict
 from datetime import datetime
-
-NEEDLES = [
-    ("DPF/GPF soot", "soot"),
-    ("Regeneration in progress", "regen"),
-    ("Distance since last regeneration", "dist_since"),
-    ("Engine oil temperature", "oil_t"),
-    ("Engine coolant temperature", "coolant"),
-    ("MAF air flow rate", "maf"),
-    ("Vehicle speed", "speed"),
-    ("Engine RPM x1000", "_skip"),
-    ("Engine RPM", "rpm"),
-]
-
-_pc = {}
-def classify(pid):
-    if pid in _pc: return _pc[pid]
-    res = None
-    for n, k in NEEDLES:
-        if n in pid:
-            res = k if k != "_skip" else None
-            break
-    _pc[pid] = res
-    return res
+from pids import classify
 
 def parse_fname(p):
     m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$", p)
@@ -72,7 +50,7 @@ def scan_file(path):
             series[k].append((t, v))
 
     ts_obj = {k: TS(sorted(v)) for k, v in series.items()}
-    soot = sorted(series.get("soot", []))
+    soot = sorted(series.get("soot_trig", []))
 
     out = {
         "file": os.path.basename(path),
@@ -106,7 +84,7 @@ def scan_file(path):
     out["active_spans"] = len(active)
 
     # regen completed?
-    ds = sorted(series.get("dist_since", []))
+    ds = sorted(series.get("d_since_regen", []))
     out["regen_completed"] = False
     for i in range(1, len(ds)):
         if ds[i][1] < ds[i-1][1] - 10:
@@ -120,7 +98,7 @@ def scan_file(path):
         return active_starts[i] - 30 <= t <= active_ends[i] + 30
 
     oil_t = ts_obj.get("oil_t", TS([]))
-    coolant = ts_obj.get("coolant", TS([]))
+    coolant = ts_obj.get("coolant_t", TS([]))
     speed = ts_obj.get("speed", TS([]))
     rpm = ts_obj.get("rpm", TS([]))
     maf = ts_obj.get("maf", TS([]))
