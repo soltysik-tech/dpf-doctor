@@ -3,36 +3,7 @@
 import argparse, csv, glob, os, re, json, sys, time
 from collections import defaultdict
 from datetime import datetime
-
-NEEDLES = [
-    ("Regeneration in progress", "regen"),
-    ("DPF differential pressure", "dpf_dp"),
-    ("DPF/GPF soot", "soot_trig"),
-    ("Distance since last regeneration", "d_since_regen"),
-    ("Engine oil temperature", "oil_t"),
-    ("Engine coolant temperature", "coolant_t"),
-    ("Intake air temperature", "iat"),
-    ("Engine RPM x1000", "rpm_k"),
-    ("Engine RPM", "rpm"),
-    ("Vehicle speed", "speed"),
-    ("EGR system control", "egr_duty"),
-    ("MAF air flow rate", "maf"),
-    ("Calculated engine load value", "load"),
-    ("Throttle position", "tps"),
-    ("Instantaneous fuel consumption (l/100 km)", "fuel_l100"),
-    ("Instantaneous fuel consumption", "fuel_rate"),
-    ("Total distance travelled", "odo_total"),
-    ("Distance travelled", "trip_dist"),
-    ("Power from MAF", "power_maf"),
-    ("Average Distance Between PF Regens", "avg_d_regen"),
-]
-_pc = {}
-def classify(p):
-    if p in _pc: return _pc[p]
-    r = None
-    for n,k in NEEDLES:
-        if n in p: r = k; break
-    _pc[p] = r; return r
+from pids import classify
 
 def parse_fname(p):
     m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})", p)
