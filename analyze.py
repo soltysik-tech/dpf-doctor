@@ -2,7 +2,6 @@
 """Stage 1: scan CarScanner CSVs, build per-trip and regen-event summary."""
 import argparse, glob, os, sys, json, time
 
-from pids import NEEDLES, classify
 from reader import read_trip, Trip
 
 # analyze.py only tracks a subset of the shared registry.

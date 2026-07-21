@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Stage 3: infer passive regeneration episodes from soot-trigger drops under load."""
-import argparse, csv, glob, os, sys, json, bisect, re, time
+import argparse, glob, os, sys, json, bisect, time
 from collections import defaultdict
-from datetime import datetime
 from reader import read_trip, Trip
 
 class TS:
