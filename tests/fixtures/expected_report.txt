@@ -1,0 +1,24 @@
+=== DPF Report ===
+total trips logged     : 1
+first log              : 2026-06-23T10:26:50
+last log               : 2026-06-23T10:26:50
+active regen events    : 0
+trips with active regen: 0
+
+Soot trigger % over time (last value per trip):
+  min  97.6%   max 97.6%
+  2026-06-23T10:26    97.6 %
+
+DPF differential pressure (kPa, last-of-trip):
+  avg 5.40  median 5.40  min 5.40  max 5.40
+  per-trip MAX dp avg 5.40  overall max 5.40
+
+ECM-reported average distance between regens (km):
+  start 637  end 637  min 637  max 637  avg 637
+ECM-reported average time between regens (s):
+  start 1196  end 1196  min 1196  max 1196  avg 1196
+
+'Distance since last regen' last value per trip (km):
+  2026-06-23T10:26   603.52 km
+
+No active regeneration events detected in the logs.
