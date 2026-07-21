@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Stage 1: scan CarScanner CSVs, build per-trip and regen-event summary."""
-import argparse, csv, glob, os, re, sys, json, time
-from collections import defaultdict
-from datetime import datetime
+import argparse, glob, os, sys, json, time
 
 from pids import NEEDLES, classify
+from reader import read_trip, Trip
 
 # analyze.py only tracks a subset of the shared registry.
 _ANALYZE_KEYS = frozenset({
@@ -13,63 +12,39 @@ _ANALYZE_KEYS = frozenset({
     "coolant_t", "oil_t", "oil_lvl", "nox_regen",
 })
 
-def parse_fname(p):
-    m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$", p)
-    if not m: return None
-    return datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4)}",
-                             "%Y-%m-%d %H:%M:%S")
-
-def f(x):
-    try: return float(x)
-    except: return None
-
-def scan_file(path):
-    start = parse_fname(path)
-    # Track time series per key
-    series = defaultdict(list)  # key -> [(t, v)]
-    t_min, t_max = None, None
-    with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-        r = csv.reader(fh, delimiter=";")
-        next(r, None)
-        for row in r:
-            if len(row) < 4: continue
-            t = f(row[0]); pid = row[1].strip(); v = f(row[2])
-            if t is None or v is None: continue
-            k = classify(pid)
-            if k is None or k not in _ANALYZE_KEYS: continue
-            series[k].append((t, v))
-            if t_min is None or t < t_min: t_min = t
-            if t_max is None or t > t_max: t_max = t
+def analyze_trip(trip: Trip) -> dict:
+    series = {k: v for k, v in trip.series.items() if k in _ANALYZE_KEYS}
     summary = {
-        "file": os.path.basename(path),
-        "start": start.isoformat() if start else None,
-        "duration_s": (t_max - t_min) if (t_min and t_max) else 0.0,
+        "file": trip.path,
+        "start": trip.start.isoformat() if trip.start else None,
+        "duration_s": trip.duration_s,
     }
-    # snapshot last + min/max
     for k, pts in series.items():
         vals = [v for _, v in pts]
-        if not vals: continue
+        if not vals:
+            continue
         summary[f"{k}_first"] = vals[0]
         summary[f"{k}_last"] = vals[-1]
         summary[f"{k}_min"] = min(vals)
         summary[f"{k}_max"] = max(vals)
-    # regen events: contiguous spans where regen==2 (active)
+
     events = []
     regen = series.get("regen", [])
     if regen:
-        # Build index by time of speed, rpm, coolant, soot etc. for sampling
         def latest_before(key, t):
             arr = series.get(key, [])
-            if not arr: return None
-            # binary search would be ideal but linear OK for small N
+            if not arr:
+                return None
             v = None
             for tt, vv in arr:
-                if tt <= t: v = vv
-                else: break
+                if tt <= t:
+                    v = vv
+                else:
+                    break
             return v
         cur = None
         for t, v in regen:
-            active = (v >= 1.5)  # 2 == active
+            active = (v >= 1.5)
             if active and cur is None:
                 cur = {"t_start": t,
                        "soot_start": latest_before("soot_trig", t),
@@ -101,11 +76,11 @@ def scan_file(path):
             cur["d_since_end"] = latest_before("d_since_regen", cur["t_end"])
             cur["truncated"] = True
             events.append(cur)
-    # compact events
     compact = []
     for e in events:
         def stat(arr):
-            if not arr: return None
+            if not arr:
+                return None
             return {"avg": sum(arr)/len(arr), "min": min(arr), "max": max(arr)}
         compact.append({
             "duration_s": round(e.get("duration_s", 0), 1),
@@ -139,7 +114,10 @@ def main():
     out = []
     for i, p in enumerate(files):
         try:
-            out.append(scan_file(p))
+            trip = read_trip(p)
+            if trip is None:
+                continue
+            out.append(analyze_trip(trip))
         except Exception as ex:
             print(f"ERR {p}: {ex}", file=sys.stderr)
 
