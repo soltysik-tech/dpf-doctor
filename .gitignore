@@ -13,3 +13,5 @@ venv/
 .vscode/
 .idea/
 *.swp
+
+docs/superpowers/
