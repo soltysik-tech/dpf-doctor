@@ -3,19 +3,7 @@
 import argparse, csv, glob, os, sys, json, bisect, re, time
 from collections import defaultdict
 from datetime import datetime
-from pids import classify
-
-def parse_fname(p):
-    m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$", p)
-    if not m: return None
-    try:
-        return datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4)}",
-                                 "%Y-%m-%d %H:%M:%S")
-    except: return None
-
-def f(x):
-    try: return float(x)
-    except: return None
+from reader import read_trip, Trip
 
 class TS:
     """Fast time-series with bisect lookups."""
@@ -35,26 +23,14 @@ DROP_MIN = 1.5
 OIL_MIN, COOLANT_MIN, SPEED_MIN, RPM_MIN, MAF_MIN = 80.0, 85.0, 50.0, 1500.0, 15.0
 MIN_EP = 60
 
-def scan_file(path):
-    start = parse_fname(path)
-    series = defaultdict(list)
-    with open(path, "r", encoding="utf-8", errors="ignore") as fh:
-        r = csv.reader(fh, delimiter=";")
-        next(r, None)
-        for row in r:
-            if len(row) < 4: continue
-            t = f(row[0]); pid = row[1].strip().strip('"'); v = f(row[2])
-            if t is None or v is None: continue
-            k = classify(pid)
-            if k is None: continue
-            series[k].append((t, v))
-
-    ts_obj = {k: TS(sorted(v)) for k, v in series.items()}
-    soot = sorted(series.get("soot_trig", []))
+def detect_passive(trip: Trip) -> dict:
+    series = trip.series
+    ts_obj = {k: TS(v) for k, v in series.items()}  # series values already sorted by reader
+    soot = series.get("soot_trig", [])
 
     out = {
-        "file": os.path.basename(path),
-        "start": start.isoformat() if start else None,
+        "file": trip.path,
+        "start": trip.start.isoformat() if trip.start else None,
     }
 
     if len(soot) < 10:
@@ -71,7 +47,7 @@ def scan_file(path):
     # active spans
     active = []
     cur = None
-    for t, v in sorted(series.get("regen", [])):
+    for t, v in series.get("regen", []):
         a = v >= 1.5
         if a and cur is None: cur = [t, t]
         elif a: cur[1] = t
@@ -84,7 +60,7 @@ def scan_file(path):
     out["active_spans"] = len(active)
 
     # regen completed?
-    ds = sorted(series.get("d_since_regen", []))
+    ds = series.get("d_since_regen", [])
     out["regen_completed"] = False
     for i in range(1, len(ds)):
         if ds[i][1] < ds[i-1][1] - 10:
@@ -190,7 +166,10 @@ def main():
     results = []
     for i, p in enumerate(files):
         try:
-            results.append(scan_file(p))
+            trip = read_trip(p)
+            if trip is None:
+                continue
+            results.append(detect_passive(trip))
         except Exception as ex:
             print(f"ERR {p}: {ex}", file=sys.stderr)
 
