@@ -4,33 +4,7 @@ import argparse, csv, glob, os, re, sys, json, time
 from collections import defaultdict
 from datetime import datetime
 
-# Substring match, first hit wins; order matters (longer prefixes first).
-NEEDLES = [
-    ("Regeneration in progress", "regen"),
-    ("DPF differential pressure", "dpf_dp"),
-    ("DPF/GPF soot", "soot_trig"),
-    ("Average Time Between PF Regens", "avg_t_regen"),
-    ("Average Distance Between PF Regens", "avg_d_regen"),
-    ("Distance since last regeneration", "d_since_regen"),
-    ("Total distance travelled", "odo_total"),
-    ("Distance travelled", "trip_dist"),
-    ("Vehicle speed", "speed"),
-    ("Engine RPM x1000", "rpm_k"),
-    ("Engine RPM", "rpm"),
-    ("Engine coolant temperature", "coolant_t"),
-    ("Engine oil temperature", "oil_t"),
-    ("Oil level", "oil_lvl"),
-    ("NOx adsorber regeneration status", "nox_regen"),
-]
-_pid_cache = {}
-def classify(pid):
-    if pid in _pid_cache: return _pid_cache[pid]
-    res = None
-    for needle, key in NEEDLES:
-        if needle in pid:
-            res = key; break
-    _pid_cache[pid] = res
-    return res
+from pids import NEEDLES, classify
 
 def parse_fname(p):
     m = re.search(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$", p)

@@ -23,16 +23,8 @@ _ENTRIES: tuple[tuple[str, str, Optional[str]], ...] = (
     ("Engine RPM", "rpm", "rpm"),
     ("Engine coolant temperature", "coolant_t", "C"),
     ("Engine oil temperature", "oil_t", "C"),
-    ("Intake air temperature", "iat", "C"),
     ("Oil level", "oil_lvl", "%"),
     ("NOx adsorber regeneration status", "nox_regen", None),
-    ("EGR system control", "egr_duty", "%"),
-    ("MAF air flow rate", "maf", "g/s"),
-    ("Calculated engine load value", "load", "%"),
-    ("Throttle position", "tps", "%"),
-    ("Instantaneous fuel consumption (l/100 km)", "fuel_l100", "l/100km"),
-    ("Instantaneous fuel consumption", "fuel_rate", "l/h"),
-    ("Power from MAF", "power_maf", "kW"),
 )
 
 NEEDLES: tuple[tuple[str, str], ...] = tuple((n, k) for n, k, _ in _ENTRIES)
