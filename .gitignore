@@ -1,0 +1,15 @@
+data/*.csv
+!data/2026-06-23 10-26-50.csv
+data/*.json
+
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+.DS_Store
+.vscode/
+.idea/
+*.swp
