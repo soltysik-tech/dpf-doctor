@@ -60,22 +60,23 @@ The tool assumes your CarScanner CSVs use the semicolon separator and the standa
 ```
 git clone https://github.com/soltysik-tech/dpf-doctor
 cd dpf-doctor
+pip install -e .
 cp ~/carscanner-exports/*.csv data/
-python run.py
+dpf-doctor run
 ```
 
-That's it. `run.py` runs the four pipeline stages in order and prints the report at the end. A hand-anonymized sample trip ships at `data/2026-06-23 10-26-50.csv` (GPS columns stripped) so the pipeline runs end-to-end on a fresh clone.
+That's it. `dpf-doctor run` runs the four pipeline stages in order and prints the report at the end. A hand-anonymized sample trip ships at `data/2026-06-23 10-26-50.csv` (GPS columns stripped) so the pipeline runs end-to-end on a fresh clone.
 
 Individual stages if you want them:
 
 ```
-python analyze.py    # data/*.csv → data/summary.json (per-trip)
-python deep.py       # data/*.csv → data/trips.json (1Hz time series)
-python passive.py    # passive-regen detection → data/passive_summary.json
-python report.py     # reads the JSONs → stdout report
+dpf-doctor analyze    # data/*.csv -> data/summary.json (per-trip)
+dpf-doctor extract    # data/*.csv -> data/trips.json (1Hz time series)
+dpf-doctor passive    # passive-regen detection -> data/passive_summary.json
+dpf-doctor report     # reads summary.json -> stdout report
 ```
 
-All scripts accept `--data-dir DIR` to point somewhere other than `./data/`.
+All subcommands accept `--data-dir DIR` to point somewhere other than `./data/`.
 
 ## Optional: virtualenv
 
@@ -101,10 +102,10 @@ The "soot trigger" PID this tool relies on is a normalized 0-100% value the ECU 
 
 ## How the pipeline works
 
-1. `analyze.py` scans every CSV and produces a per-trip summary (first/last/min/max of each PID, regen events detected, trip duration and distance).
-2. `deep.py` scans every CSV again and produces a per-trip 1Hz time series for the PIDs used in richer analyses.
-3. `passive.py` looks at the time series and infers **passive regeneration** events - the ECU never flags these directly, but you can detect them from soot-trigger drops during sustained high load.
-4. `report.py` reads the two summary files and prints the report.
+1. `dpf-doctor analyze` scans every CSV and produces a per-trip summary (first/last/min/max of each PID, regen events detected, trip duration and distance).
+2. `dpf-doctor extract` scans every CSV again and produces a per-trip 1Hz time series for the PIDs used in richer analyses.
+3. `dpf-doctor passive` looks at the time series and infers **passive regeneration** events - the ECU never flags these directly, but you can detect them from soot-trigger drops during sustained high load.
+4. `dpf-doctor report` reads `summary.json` and prints the report.
 
 The intermediate JSONs land under `data/` and are gitignored. Rerun the pipeline whenever you add new CSVs to `data/`.
 

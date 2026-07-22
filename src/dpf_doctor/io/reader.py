@@ -9,21 +9,13 @@ import csv
 import os
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from pids import classify
+from dpf_doctor.pids import classify
+from dpf_doctor.trip import Trip
 
 _FNAME_RE = re.compile(r"(\d{4}-\d{2}-\d{2}) (\d{2})-(\d{2})-(\d{2})\.csv$")
-
-
-@dataclass
-class Trip:
-    path: str
-    start: Optional[datetime]
-    duration_s: float
-    series: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
 
 
 def parse_trip_start(path: str) -> Optional[datetime]:

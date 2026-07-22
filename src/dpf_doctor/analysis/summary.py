@@ -1,18 +1,29 @@
-#!/usr/bin/env python3
 """Stage 1: scan CarScanner CSVs, build per-trip and regen-event summary."""
-import argparse, glob, os, sys, json, time
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Optional
 
-from reader import read_trip, Trip
+from dpf_doctor.io.reader import read_trip
+from dpf_doctor.pids import PID_KEYS
+from dpf_doctor.trip import Trip
 
-# analyze.py only tracks a subset of the shared registry.
-_ANALYZE_KEYS = frozenset({
+# Summary only tracks a subset of the shared PID registry.
+_SUMMARY_KEYS = frozenset({
     "regen", "dpf_dp", "soot_trig", "avg_t_regen", "avg_d_regen",
     "d_since_regen", "odo_total", "trip_dist", "speed", "rpm_k", "rpm",
     "coolant_t", "oil_t", "oil_lvl", "nox_regen",
 })
+# Fail fast at import if a key was renamed in pids.py without updating this set.
+assert _SUMMARY_KEYS <= set(PID_KEYS), (
+    f"_SUMMARY_KEYS drift from pids.PID_KEYS: {_SUMMARY_KEYS - set(PID_KEYS)}"
+)
+
 
 def analyze_trip(trip: Trip) -> dict:
-    series = {k: v for k, v in trip.series.items() if k in _ANALYZE_KEYS}
+    series = {k: v for k, v in trip.series.items() if k in _SUMMARY_KEYS}
     summary = {
         "file": trip.path,
         "start": trip.start.isoformat() if trip.start else None,
@@ -97,21 +108,16 @@ def analyze_trip(trip: Trip) -> dict:
     summary["regen_active_count"] = len([e for e in compact if e["duration_s"] > 0])
     return summary
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--data-dir", default="./data",
-                    help="directory holding CarScanner *.csv exports (default: ./data)")
-    args = ap.parse_args()
 
-    files = sorted(glob.glob(os.path.join(args.data_dir, "*.csv")))
-    if not files:
-        print(f"No CSVs found in {args.data_dir!r}; drop CarScanner exports there or pass --data-dir DIR.",
-              file=sys.stderr)
-        sys.exit(1)
+def run(data_dir: str, files: Optional[list[str]] = None) -> Path:
+    """Analyze every CSV in data_dir, write summary.json, return its path."""
+    from dpf_doctor.cli._common import csv_files_or_exit
+    if files is None:
+        files = csv_files_or_exit(data_dir)
 
     t0 = time.perf_counter()
-    out = []
-    for i, p in enumerate(files):
+    out: list[dict] = []
+    for p in files:
         try:
             trip = read_trip(p)
             if trip is None:
@@ -120,24 +126,21 @@ def main():
         except Exception as ex:
             print(f"ERR {p}: {ex}", file=sys.stderr)
 
-    # PID coverage summary: which keys appear in any per-trip summary?
     seen = set()
     for s in out:
         for field in s:
-            for key in _ANALYZE_KEYS:
+            for key in _SUMMARY_KEYS:
                 if field == f"{key}_last":
                     seen.add(key)
-    all_keys = set(_ANALYZE_KEYS)
-    missing = sorted(all_keys - seen)
+    missing = sorted(set(_SUMMARY_KEYS) - seen)
     coverage = "found: " + (", ".join(sorted(seen)) or "(none)")
     if missing:
         coverage += "  |  missing: " + ", ".join(missing)
 
-    out_path = os.path.join(args.data_dir, "summary.json")
+    out_path = Path(data_dir) / "summary.json"
     with open(out_path, "w") as fh:
         json.dump(out, fh, default=str)
     dt = time.perf_counter() - t0
     print(f"Scanned {len(files)} CSVs -> {out_path} ({dt:.1f}s)")
     print(f"  PIDs {coverage}", file=sys.stderr)
-
-if __name__ == "__main__": main()
+    return out_path

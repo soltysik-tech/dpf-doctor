@@ -1,9 +1,9 @@
-"""Unit tests for reader.read_trip."""
+"""Unit tests for the CSV reader."""
 import unittest
 from datetime import datetime
 from pathlib import Path
 
-from reader import Trip, parse_trip_start, read_trip
+from dpf_doctor.io.reader import parse_trip_start, read_trip
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SAMPLE = FIXTURES / "sample_data" / "2026-06-23 10-26-50.csv"

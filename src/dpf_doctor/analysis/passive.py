@@ -1,26 +1,22 @@
-#!/usr/bin/env python3
 """Stage 3: infer passive regeneration episodes from soot-trigger drops under load."""
-import argparse, glob, os, sys, json, bisect, time
+import bisect
+import json
+import sys
+import time
 from collections import defaultdict
-from reader import read_trip, Trip
+from pathlib import Path
+from typing import Optional
 
-class TS:
-    """Fast time-series with bisect lookups."""
-    __slots__ = ("ts", "vs")
-    def __init__(self, arr):
-        self.ts = [x[0] for x in arr]
-        self.vs = [x[1] for x in arr]
-    def at(self, t):
-        if not self.ts: return None
-        i = bisect.bisect_right(self.ts, t) - 1
-        if i < 0: return None
-        return self.vs[i]
+from dpf_doctor.analysis.timeseries import TS
+from dpf_doctor.io.reader import read_trip
+from dpf_doctor.trip import Trip
 
 # Thresholds
 WIN_MIN, WIN_MAX = 60, 300
 DROP_MIN = 1.5
 OIL_MIN, COOLANT_MIN, SPEED_MIN, RPM_MIN, MAF_MIN = 80.0, 85.0, 50.0, 1500.0, 15.0
 MIN_EP = 60
+
 
 def detect_passive(trip: Trip) -> dict:
     series = trip.series
@@ -117,7 +113,7 @@ def detect_passive(trip: Trip) -> dict:
         drop = sv_i - min_v
         dur = soot[min_j][0] - t_i
         if drop >= DROP_MIN and dur >= MIN_EP:
-            t_start = t_i; t_end = soot[min_j][0]
+            t_start = t_i
             sps, oils, mafs, rpms = [], [], [], []
             for k in range(i, min_j+1):
                 t_k = soot[k][0]
@@ -149,29 +145,8 @@ def detect_passive(trip: Trip) -> dict:
     out["passive_total_s"] = round(sum(e["duration_s"] for e in episodes), 0)
     return out
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--data-dir", default="./data",
-                    help="directory holding CarScanner *.csv exports (default: ./data)")
-    args = ap.parse_args()
 
-    files = sorted(glob.glob(os.path.join(args.data_dir, "*.csv")))
-    if not files:
-        print(f"No CSVs found in {args.data_dir!r}; drop CarScanner exports there or pass --data-dir DIR.",
-              file=sys.stderr)
-        sys.exit(1)
-
-    t0 = time.perf_counter()
-    results = []
-    for i, p in enumerate(files):
-        try:
-            trip = read_trip(p)
-            if trip is None:
-                continue
-            results.append(detect_passive(trip))
-        except Exception as ex:
-            print(f"ERR {p}: {ex}", file=sys.stderr)
-
+def _print_summary(results: list[dict]) -> None:
     n = len(results)
     n_with = sum(1 for r in results if r.get("passive_count", 0) > 0)
     n_completed = sum(1 for r in results if r.get("regen_completed"))
@@ -189,7 +164,6 @@ def main():
     if total_eps:
         print(f"Avg drop/episode: {total_drop/total_eps:.2f} pkt, avg dur: {total_t/total_eps:.0f}s")
 
-    # by year + month
     by_year = defaultdict(lambda: {"eps":0,"drop":0,"t":0,"files":0,"files_with":0})
     for r in results:
         if not r.get("start"): continue
@@ -207,7 +181,6 @@ def main():
         pct = 100*d['files_with']/d['files']
         print(f"{yr:6s} {d['files']:6d} {d['files_with']:6d} ({pct:4.1f}%)  {d['eps']:6d} {d['drop']:10.1f} {d['t']/60:10.1f}")
 
-    # top eps
     all_eps = []
     for r in results:
         for e in r.get("passive_episodes", []):
@@ -219,7 +192,6 @@ def main():
         print(f"{e['file']:30s} {e['duration_s']:6.0f} {e['soot_drop']:6.1f} {e['burn_rate_per_min']:5.2f}/min "
               f"{str(e['speed_avg']):>5s} {str(e['oil_avg']):>5s} {str(e['maf_avg']):>6s} {str(e['rpm_avg']):>5s}")
 
-    # speed bucket analysis
     print(f"\n=== BURN RATE vs AVG SPEED ===")
     buckets = [(0,40,"city slow"), (40,60,"city fast"), (60,80,"backroad"),
                (80,100,"main road"), (100,120,"highway"), (120,200,"fast highway")]
@@ -230,10 +202,30 @@ def main():
             rates = [e["burn_rate_per_min"] for e in eps_b]
             print(f"  {lab:14s} ({lo:3d}-{hi:3d} km/h): n={len(eps_b):3d}  avg_drop={sum(drops)/len(drops):.1f} pkt  rate={sum(rates)/len(rates):.2f} pkt/min")
 
-    out_path = os.path.join(args.data_dir, "passive_summary.json")
+
+def run(data_dir: str, files: Optional[list[str]] = None, print_summary: bool = True) -> Path:
+    """Detect passive regens across every CSV in data_dir, write passive_summary.json, return its path."""
+    from dpf_doctor.cli._common import csv_files_or_exit
+    if files is None:
+        files = csv_files_or_exit(data_dir)
+
+    t0 = time.perf_counter()
+    results: list[dict] = []
+    for p in files:
+        try:
+            trip = read_trip(p)
+            if trip is None:
+                continue
+            results.append(detect_passive(trip))
+        except Exception as ex:
+            print(f"ERR {p}: {ex}", file=sys.stderr)
+
+    if print_summary and results:
+        _print_summary(results)
+
+    out_path = Path(data_dir) / "passive_summary.json"
     with open(out_path, "w") as fh:
         json.dump(results, fh, default=str)
     dt = time.perf_counter() - t0
     print(f"\nSaved passive-detection results -> {out_path} ({dt:.1f}s)")
-
-if __name__ == "__main__": main()
+    return out_path
