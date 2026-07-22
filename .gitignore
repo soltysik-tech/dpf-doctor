@@ -9,6 +9,11 @@ __pycache__/
 venv/
 .env
 
+# Python packaging build artifacts
+*.egg-info/
+build/
+dist/
+
 .DS_Store
 .vscode/
 .idea/

@@ -1,11 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dpf-doctor"
-version = "0.1.0"
+version = "0.2.0"
 description = "Analyze OBD-II logs from a Volvo XC60 II to check DPF regeneration health, soot accumulation, and pressure trends."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Mateusz Soltysik" }]
 requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
 
 [project.urls]
 Homepage = "https://github.com/soltysik-tech/dpf-doctor"
+
+[project.scripts]
+dpf-doctor = "dpf_doctor.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

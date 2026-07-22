@@ -1,7 +1,7 @@
-"""Unit tests for pids.PidRegistry."""
+"""Unit tests for the PID registry."""
 import unittest
 
-import pids
+from dpf_doctor import pids
 
 
 class TestClassify(unittest.TestCase):
